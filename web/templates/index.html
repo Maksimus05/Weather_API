@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌤️ Weather API</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-cloud-sun"></i>
+                <h1>Weather API</h1>
+            </div>
+            <p class="subtitle">Простое REST API для получения информации о погоде</p>
+        </header>
+
+        <section class="quick-start">
+            <h2><i class="fas fa-bolt"></i> Быстрый старт</h2>
+            <div class="city-buttons">
+                <a href="/weather?city=Moscow" class="city-btn">
+                    <i class="fas fa-building"></i> Москва
+                </a>
+                <a href="/weather?city=London" class="city-btn">
+                    <i class="fas fa-umbrella"></i> Лондон
+                </a>
+                <a href="/weather?city=Tokyo" class="city-btn">
+                    <i class="fas fa-torii-gate"></i> Токио
+                </a>
+                <a href="/weather?city=New York" class="city-btn">
+                    <i class="fas fa-statue-of-liberty"></i> Нью-Йорк
+                </a>
+                <a href="/health" class="city-btn health">
+                    <i class="fas fa-heart-pulse"></i> Проверка
+                </a>
+            </div>
+        </section>
+
+        <section class="api-endpoints">
+            <h2><i class="fas fa-satellite-dish"></i> API Эндпоинты</h2>
+            
+            <div class="endpoint-card">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <code class="endpoint-url">/weather?city={название}</code>
+                </div>
+                <p class="endpoint-desc">Получить погоду для указанного города</p>
+                <div class="example">
+                    <strong>Пример:</strong>
+                    <code><a href="/weather?city=Moscow" class="example-link">/weather?city=Moscow</a></code>
+                </div>
+                <div class="try-it">
+                    <input type="text" id="cityInput" placeholder="Введите город" value="Moscow">
+                    <button onclick="tryEndpoint()" class="try-btn">
+                        <i class="fas fa-play"></i> Попробовать
+                    </button>
+                </div>
+            </div>
+            
+            <div class="endpoint-card">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <code class="endpoint-url">/health</code>
+                </div>
+                <p class="endpoint-desc">Проверить работоспособность сервиса</p>
+                <div class="example">
+                    <strong>Пример:</strong>
+                    <code><a href="/health" class="example-link">/health</a></code>
+                </div>
+            </div>
+        </section>
+
+        <section class="setup">
+            <h2><i class="fas fa-cogs"></i> Настройка</h2>
+            <p>Для получения реальных данных о погоде:</p>
+            <ol class="setup-steps">
+                <li>
+                    <i class="fas fa-user-plus"></i>
+                    Зарегистрируйтесь на <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a>
+                </li>
+                <li>
+                    <i class="fas fa-key"></i>
+                    Получите бесплатный API ключ
+                </li>
+                <li>
+                    <i class="fas fa-terminal"></i>
+                    Установите переменную окружения:
+                    <div class="code-block">
+                        <code>export OPENWEATHER_API_KEY=ваш_ключ</code>
+                        <button onclick="copyCode(this)" class="copy-btn">
+                            <i class="far fa-copy"></i>
+                        </button>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+        <section class="technologies">
+            <h2><i class="fas fa-tools"></i> Технологии</h2>
+            <div class="tech-icons">
+                <div class="tech">
+                    <i class="fab fa-golang"></i>
+                    <span>Go</span>
+                </div>
+                <div class="tech">
+                    <i class="fab fa-linux"></i>
+                    <span>WSL2</span>
+                </div>
+                <div class="tech">
+                    <i class="fab fa-docker"></i>
+                    <span>Docker</span>
+                </div>
+                <div class="tech">
+                    <i class="fab fa-git-alt"></i>
+                    <span>Git</span>
+                </div>
+                <div class="tech">
+                    <i class="fas fa-server"></i>
+                    <span>Debian</span>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="response-area">
+                <h3><i class="fas fa-code"></i> Ответ API</h3>
+                <pre id="apiResponse">{
+  "status": "Готов к работе!",
+  "message": "Введите город и нажмите 'Попробовать'"
+}</pre>
+            </div>
+            <p class="footer-text">
+                <i class="fas fa-heart"></i> Создано с помощью Go и WSL
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function tryEndpoint() {
+            const city = document.getElementById('cityInput').value || 'Moscow';
+            const responseArea = document.getElementById('apiResponse');
+            
+            responseArea.textContent = "Загружаем данные...";
+            responseArea.classList.add('loading');
+            
+            fetch(`/weather?city=${encodeURIComponent(city)}`)
+                .then(response => response.json())
+                .then(data => {
+                    responseArea.textContent = JSON.stringify(data, null, 2);
+                    responseArea.classList.remove('loading');
+                    responseArea.classList.add('success');
+                })
+                .catch(error => {
+                    responseArea.textContent = `Ошибка: ${error}`;
+                    responseArea.classList.remove('loading');
+                    responseArea.classList.add('error');
+                });
+        }
+
+        function copyCode(button) {
+            const code = button.previousElementSibling.textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const icon = button.querySelector('i');
+                icon.className = 'fas fa-check';
+                setTimeout(() => {
+                    icon.className = 'far fa-copy';
+                }, 2000);
+            });
+        }
+
+        // Пробуем API при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(tryEndpoint, 500);
+        });
+    </script>
+</body>
+</html>
