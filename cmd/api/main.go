@@ -1,73 +1,105 @@
 package main
 
 import (
-    "encoding/json"
     "log"
     "net/http"
     "os"
+    "path/filepath"
+    "strings"
+    "weather/internal/handlers"
 )
 
 func main() {
-    // 1. Проверяем существование файлов
-    log.Println("🔍 Проверяем файлы...")
+    log.Println("🌤️  Запуск Weather API...")
     
-    if _, err := os.Stat("web/templates/index.html"); err != nil {
-        log.Printf("❌ index.html не найден: %v", err)
+    // Получаем абсолютный путь к проекту
+    projectRoot, err := os.Getwd()
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Printf("📁 Рабочая директория: %s", projectRoot)
+    
+    // Проверяем API ключ
+    apiKey := os.Getenv("OPENWEATHER_API_KEY")
+    if apiKey == "" {
+        log.Println("⚠️  OPENWEATHER_API_KEY не установлен")
     } else {
-        log.Println("✅ index.html найден")
+        log.Printf("✅ API ключ найден")
     }
     
-    if _, err := os.Stat("web/static/style.css"); err != nil {
-        log.Printf("❌ style.css не найден: %v", err)
+    // Пути к файлам
+    staticPath := filepath.Join(projectRoot, "..", "web", "static")
+    templatePath := filepath.Join(projectRoot, "..", "web", "templates", "index.html")
+    
+    log.Printf("📁 Путь к статике: %s", staticPath)
+    log.Printf("📁 Путь к шаблону: %s", templatePath)
+    
+    // Проверяем существование файлов
+    if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+        log.Printf("❌ Файл не найден: %s", templatePath)
     } else {
-        log.Println("✅ style.css найден")
+        log.Printf("✅ HTML файл найден")
     }
     
-    // 2. Настраиваем статические файлы
+    // Статические файлы
     http.Handle("/static/", 
         http.StripPrefix("/static/", 
-            http.FileServer(http.Dir("web/static"))))
+            http.FileServer(http.Dir(staticPath))))
     
-    // 3. Главная страница - ПРОСТО ОТДАЕМ ФАЙЛ
+    // Главная страница - ПРАВИЛЬНЫЙ ПУТЬ
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        log.Printf("📄 Запрос главной страницы: %s", r.URL.Path)
+        
         if r.URL.Path != "/" {
             http.NotFound(w, r)
             return
         }
-        http.ServeFile(w, r, "web/templates/index.html")
-    })
-    
-    // 4. API endpoints
-    http.HandleFunc("/weather", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        city := r.URL.Query().Get("city")
-        if city == "" {
-            city = "Moscow"
+        
+        // Пробуем разные пути к файлу
+        possiblePaths := []string{
+            templatePath,
+            filepath.Join(projectRoot, "web", "templates", "index.html"),
+            "../web/templates/index.html",
+            "../../web/templates/index.html",
         }
         
-        json.NewEncoder(w).Encode(map[string]interface{}{
-            "city":        city,
-            "temp":        22.5,
-            "description": "ясно",
-            "success":     true,
-        })
+        for _, path := range possiblePaths {
+            if _, err := os.Stat(path); err == nil {
+                log.Printf("✅ Отдаю файл: %s", path)
+                http.ServeFile(w, r, path)
+                return
+            }
+        }
+        
+        // Если файл не найден - выводим простую страницу
+        log.Println("❌ HTML файл не найден")
+        w.Header().Set("Content-Type", "text/html")
+        w.Write([]byte(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Weather API</title></head>
+            <body>
+                <h1>🌤️ Weather API работает!</h1>
+                <p>Но index.html не найден.</p>
+                <p>Проверьте:</p>
+                <ul>
+                    <li><a href="/health">/health</a> - работает</li>
+                    <li><a href="/weather?city=Moscow">/weather</a> - работает</li>
+                </ul>
+            </body>
+            </html>
+        `))
     })
     
-    http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
-            "status": "healthy",
-        })
-    })
+    // API endpoints
+    http.HandleFunc("/weather", handlers.WeatherHandler)
+    http.HandleFunc("/health", handlers.HealthHandler)
     
-    // 5. Запуск
-    port := "8080"
     log.Println("\n" + strings.Repeat("=", 50))
-    log.Println("✅ Weather API запущен!")
-    log.Println("📍 http://localhost:" + port)
-    log.Println("🎨 CSS: http://localhost:" + port + "/static/style.css")
-    log.Println("📡 API: http://localhost:" + port + "/weather?city=Moscow")
+    log.Println("✅ Сервер запущен: http://localhost:8080")
+    log.Println("📡 /weather?city=Москва - получение погоды")
+    log.Println("❤️  /health - проверка сервиса")
     log.Println(strings.Repeat("=", 50))
     
-    log.Fatal(http.ListenAndServe(":"+port, nil))
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }
