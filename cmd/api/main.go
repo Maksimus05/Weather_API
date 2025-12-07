@@ -1,100 +1,73 @@
 package main
 
 import (
-    "html/template"
+    "encoding/json"
     "log"
     "net/http"
     "os"
-    "path/filepath"
-    "weather/internal/handlers"
 )
 
 func main() {
-    // Загружаем HTML шаблон
-    tmpl, err := loadTemplate()
-    if err != nil {
-        log.Fatal("Ошибка загрузки шаблона:", err)
+    // 1. Проверяем существование файлов
+    log.Println("🔍 Проверяем файлы...")
+    
+    if _, err := os.Stat("web/templates/index.html"); err != nil {
+        log.Printf("❌ index.html не найден: %v", err)
+    } else {
+        log.Println("✅ index.html найден")
     }
-
-    // Настраиваем обработчики
+    
+    if _, err := os.Stat("web/static/style.css"); err != nil {
+        log.Printf("❌ style.css не найден: %v", err)
+    } else {
+        log.Println("✅ style.css найден")
+    }
+    
+    // 2. Настраиваем статические файлы
+    http.Handle("/static/", 
+        http.StripPrefix("/static/", 
+            http.FileServer(http.Dir("web/static"))))
+    
+    // 3. Главная страница - ПРОСТО ОТДАЕМ ФАЙЛ
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         if r.URL.Path != "/" {
             http.NotFound(w, r)
             return
         }
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        tmpl.Execute(w, nil)
+        http.ServeFile(w, r, "web/templates/index.html")
     })
-
-    // Статические файлы (CSS, JS)
-    staticDir := http.Dir(filepath.Join("web", "static"))
-    http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(staticDir)))
-
-    // API эндпоинты
-    http.HandleFunc("/weather", handlers.WeatherHandler)
-    http.HandleFunc("/health", handlers.HealthHandler)
-
-    // Порт
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080"
-    }
-
-    // Информация о запуске
-    log.Println("=====================================")
-    log.Println("🌤️  Weather API запущен!")
-    log.Println("📍 Адрес: http://localhost:" + port)
-    log.Println("📁 HTML шаблоны: web/templates/")
-    log.Println("🎨 Статические файлы: web/static/")
-    log.Println("=====================================")
-    log.Println("📡 Доступные эндпоинты:")
-    log.Println("   GET /              - Домашняя страница")
-    log.Println("   GET /weather?city= - Погода для города")
-    log.Println("   GET /health        - Проверка здоровья")
-    log.Println("   GET /static/       - CSS/JS файлы")
-    log.Println("=====================================")
-
-    // Запускаем сервер
-    if err := http.ListenAndServe(":"+port, nil); err != nil {
-        log.Fatal("Ошибка запуска сервера:", err)
-    }
-}
-
-func loadTemplate() (*template.Template, error) {
-    // Ищем шаблон в разных местах (для гибкости)
-    possiblePaths := []string{
-        "web/templates/index.html",
-        "../web/templates/index.html",
-        "../../web/templates/index.html",
-    }
-
-    var tmpl *template.Template
-    var err error
-
-    for _, path := range possiblePaths {
-        tmpl, err = template.ParseFiles(path)
-        if err == nil {
-            log.Printf("✅ Шаблон загружен: %s", path)
-            return tmpl, nil
+    
+    // 4. API endpoints
+    http.HandleFunc("/weather", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        city := r.URL.Query().Get("city")
+        if city == "" {
+            city = "Moscow"
         }
-    }
-
-    // Если файл не найден, создаем простой HTML
-    if err != nil {
-        log.Printf("⚠️  Шаблон не найден, используется встроенный HTML")
         
-        htmlContent := `
-        <!DOCTYPE html>
-        <html>
-        <head><title>Weather API</title></head>
-        <body>
-            <h1>Weather API работает!</h1>
-            <p>Шаблон не найден. Проверь папку web/templates/</p>
-        </body>
-        </html>`
-        
-        return template.New("index").Parse(htmlContent)
-    }
-
-    return tmpl, nil
+        json.NewEncoder(w).Encode(map[string]interface{}{
+            "city":        city,
+            "temp":        22.5,
+            "description": "ясно",
+            "success":     true,
+        })
+    })
+    
+    http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(map[string]string{
+            "status": "healthy",
+        })
+    })
+    
+    // 5. Запуск
+    port := "8080"
+    log.Println("\n" + strings.Repeat("=", 50))
+    log.Println("✅ Weather API запущен!")
+    log.Println("📍 http://localhost:" + port)
+    log.Println("🎨 CSS: http://localhost:" + port + "/static/style.css")
+    log.Println("📡 API: http://localhost:" + port + "/weather?city=Moscow")
+    log.Println(strings.Repeat("=", 50))
+    
+    log.Fatal(http.ListenAndServe(":"+port, nil))
 }
